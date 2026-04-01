@@ -27,12 +27,14 @@ import {
   Loader2,
   LogIn,
   LogOut,
+  Menu,
   Monitor,
   Play,
   Plus,
   RefreshCw,
   Settings,
   Share2,
+  Shield,
   ShoppingBag,
   Smartphone,
   Sparkles,
@@ -77,7 +79,9 @@ type AppView =
   | "script"
   | "scenes"
   | "rendering"
-  | "output";
+  | "output"
+  | "settings"
+  | "profile";
 
 interface WizardData {
   topic: string;
@@ -154,6 +158,7 @@ function Navbar({
             [
               ["dashboard", "Dashboard"],
               ["template", "Templates"],
+              ["settings", "Settings"],
             ] as [AppView, string][]
           ).map(([v, label]) => (
             <button
@@ -174,6 +179,44 @@ function Navbar({
 
         {/* Right */}
         <div className="flex items-center gap-3 ml-auto">
+          {/* Mobile nav menu */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                className="md:hidden relative w-9 h-9 flex items-center justify-center rounded-lg hover:bg-secondary transition-colors"
+                data-ocid="nav.link"
+              >
+                <Menu className="w-4 h-4 text-muted-foreground" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent
+              align="end"
+              className="bg-popover border-border"
+            >
+              <DropdownMenuItem
+                onClick={() => onNav("dashboard")}
+                className="text-muted-foreground"
+                data-ocid="nav.link"
+              >
+                Dashboard
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => onNav("template")}
+                className="text-muted-foreground"
+                data-ocid="nav.link"
+              >
+                Templates
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => onNav("settings")}
+                className="text-muted-foreground"
+                data-ocid="nav.link"
+              >
+                <Settings className="w-4 h-4 mr-2" /> Settings
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
           <button
             type="button"
             className="relative w-9 h-9 flex items-center justify-center rounded-lg hover:bg-secondary transition-colors"
@@ -213,8 +256,19 @@ function Navbar({
                 align="end"
                 className="bg-popover border-border"
               >
-                <DropdownMenuItem className="text-muted-foreground">
+                <DropdownMenuItem
+                  onClick={() => onNav("profile")}
+                  className="text-muted-foreground"
+                  data-ocid="nav.link"
+                >
                   <User className="w-4 h-4 mr-2" /> Profile
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => onNav("settings")}
+                  className="text-muted-foreground"
+                  data-ocid="nav.link"
+                >
+                  <Settings className="w-4 h-4 mr-2" /> Settings
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   onClick={clear}
@@ -1518,6 +1572,206 @@ function Footer() {
   );
 }
 
+// ─── Settings View ────────────────────────────────────────────────────────────
+function SettingsView({
+  isLoggedIn,
+  hasOpenAIKey,
+  apiKeyInput,
+  setApiKeyInput,
+  setOpenAIKey,
+}: {
+  isLoggedIn: boolean;
+  hasOpenAIKey: boolean | undefined;
+  apiKeyInput: string;
+  setApiKeyInput: (v: string) => void;
+  setOpenAIKey: ReturnType<typeof useSetOpenAIKey>;
+}) {
+  return (
+    <div className="space-y-8 max-w-2xl" data-ocid="settings.page">
+      <div>
+        <h1 className="text-3xl font-display font-bold text-foreground">
+          Settings
+        </h1>
+        <p className="text-muted-foreground mt-1 text-sm">
+          Configure your ViralCut AI application settings.
+        </p>
+      </div>
+
+      {/* API Key Card */}
+      <div className="rounded-xl border border-border bg-card p-6 space-y-5">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center">
+            <Key className="w-5 h-5 text-primary" />
+          </div>
+          <div>
+            <h2 className="text-base font-semibold text-foreground">
+              OpenAI API Key
+            </h2>
+            <p className="text-xs text-muted-foreground">
+              Required for AI script &amp; scene generation
+            </p>
+          </div>
+          <div className="ml-auto">
+            {hasOpenAIKey === undefined ? (
+              <span className="text-xs text-muted-foreground">Checking…</span>
+            ) : hasOpenAIKey ? (
+              <span
+                className="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 rounded-full px-3 py-1"
+                data-ocid="settings.success_state"
+              >
+                <Check className="w-3 h-3" /> Configured
+              </span>
+            ) : (
+              <span
+                className="inline-flex items-center gap-1.5 text-xs font-medium text-amber-400 bg-amber-500/10 border border-amber-500/30 rounded-full px-3 py-1"
+                data-ocid="settings.error_state"
+              >
+                <AlertTriangle className="w-3 h-3" /> Not configured
+              </span>
+            )}
+          </div>
+        </div>
+
+        {isLoggedIn ? (
+          <div className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              {hasOpenAIKey
+                ? "Update your OpenAI API key below. It is stored securely on-chain."
+                : "Enter your OpenAI API key below to enable AI script and scene generation."}
+            </p>
+            <div className="flex gap-2">
+              <Input
+                type="password"
+                placeholder="sk-..."
+                value={apiKeyInput}
+                onChange={(e) => setApiKeyInput(e.target.value)}
+                className="bg-background border-border font-mono text-sm flex-1"
+                data-ocid="settings.input"
+              />
+              <Button
+                disabled={!apiKeyInput.trim() || setOpenAIKey.isPending}
+                onClick={async () => {
+                  try {
+                    await setOpenAIKey.mutateAsync(apiKeyInput.trim());
+                    toast.success("API key saved successfully!");
+                    setApiKeyInput("");
+                  } catch {
+                    toast.error(
+                      "Failed to save API key. Make sure you are an admin.",
+                    );
+                  }
+                }}
+                data-ocid="settings.save_button"
+              >
+                {setOpenAIKey.isPending ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Saving…
+                  </>
+                ) : (
+                  <>
+                    <Check className="w-4 h-4 mr-2" />
+                    Save Key
+                  </>
+                )}
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              🔒 Your key is encrypted and only used for AI generation requests.
+            </p>
+          </div>
+        ) : (
+          <p
+            className="text-sm text-muted-foreground"
+            data-ocid="settings.panel"
+          >
+            Please log in to configure the API key.
+          </p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── ProfileView ─────────────────────────────────────────────────────────────
+function ProfileView({
+  principal,
+  isAdmin,
+}: {
+  principal: string | undefined;
+  isAdmin: boolean | undefined;
+}) {
+  return (
+    <div className="space-y-8 max-w-2xl" data-ocid="profile.page">
+      <div>
+        <h1 className="text-3xl font-display font-bold text-foreground">
+          Profile
+        </h1>
+        <p className="text-muted-foreground mt-1 text-sm">
+          Your account details and identity information.
+        </p>
+      </div>
+
+      <div className="rounded-xl border border-border bg-card p-6 space-y-5">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center">
+            <User className="w-5 h-5 text-primary" />
+          </div>
+          <div>
+            <h2 className="text-base font-semibold text-foreground">
+              Identity
+            </h2>
+            <p className="text-xs text-muted-foreground">
+              Authenticated via Internet Identity
+            </p>
+          </div>
+          <div className="ml-auto">
+            <span
+              className="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 rounded-full px-3 py-1"
+              data-ocid="profile.success_state"
+            >
+              <Check className="w-3 h-3" /> Authenticated
+            </span>
+          </div>
+        </div>
+
+        <div className="space-y-3">
+          <div>
+            <p className="text-xs text-muted-foreground mb-1 uppercase tracking-wide font-medium">
+              Principal ID
+            </p>
+            <p
+              className="text-sm font-mono text-foreground bg-background border border-border rounded-lg px-4 py-3 break-all"
+              data-ocid="profile.panel"
+            >
+              {principal ?? "—"}
+            </p>
+          </div>
+
+          <div>
+            <p className="text-xs text-muted-foreground mb-1 uppercase tracking-wide font-medium">
+              Role
+            </p>
+            <div className="flex items-center gap-2">
+              {isAdmin === undefined ? (
+                <span className="text-sm text-muted-foreground">Loading…</span>
+              ) : isAdmin ? (
+                <span className="inline-flex items-center gap-1.5 text-xs font-medium text-primary bg-primary/10 border border-primary/30 rounded-full px-3 py-1">
+                  <Shield className="w-3 h-3" /> Admin
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground bg-muted/30 border border-border rounded-full px-3 py-1">
+                  <User className="w-3 h-3" /> User
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── App ──────────────────────────────────────────────────────────────────────
 export default function App() {
   const [view, setView] = useState<AppView>("dashboard");
@@ -1532,6 +1786,7 @@ export default function App() {
   const generateScenes = useGenerateScenes();
   const updateStatus = useUpdateProjectStatus();
 
+  const { identity } = useInternetIdentity();
   const { data: hasOpenAIKey } = useHasOpenAIKey();
   const { data: isAdmin } = useIsCallerAdmin();
   const setOpenAIKey = useSetOpenAIKey();
@@ -1857,6 +2112,21 @@ export default function App() {
                 )}
                 {view === "output" && (
                   <OutputView onNewVideo={handleNewVideo} />
+                )}
+                {view === "profile" && (
+                  <ProfileView
+                    principal={identity?.getPrincipal().toString()}
+                    isAdmin={isAdmin}
+                  />
+                )}
+                {view === "settings" && (
+                  <SettingsView
+                    isLoggedIn={!!identity}
+                    hasOpenAIKey={hasOpenAIKey}
+                    apiKeyInput={apiKeyInput}
+                    setApiKeyInput={setApiKeyInput}
+                    setOpenAIKey={setOpenAIKey}
+                  />
                 )}
               </motion.div>
             </AnimatePresence>

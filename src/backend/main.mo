@@ -16,9 +16,15 @@ actor {
   // ── OpenAI key ────────────────────────────────────────────────────────────
   var openAIKey : Text = "";
 
+  // Any logged-in user can set the key when none exists (first-time setup).
+  // After a key is set, only admins can change it.
   public shared ({ caller }) func setOpenAIKey(key : Text) : async () {
-    if (not AccessControl.isAdmin(accessControlState, caller)) {
-      Runtime.trap("Unauthorized: Only admins can set the API key");
+    if (caller.isAnonymous()) {
+      Runtime.trap("Must be logged in to set the API key");
+    };
+    let keyAlreadySet = openAIKey.size() > 0;
+    if (keyAlreadySet and not AccessControl.isAdmin(accessControlState, caller)) {
+      Runtime.trap("Unauthorized: Only admins can change the API key once it is set");
     };
     openAIKey := key;
   };
@@ -130,15 +136,13 @@ actor {
   };
 
   // ── OpenAI helper ─────────────────────────────────────────────────────────
-  // Returns the raw OpenAI HTTP response body so the frontend can parse it.
-  // The frontend is better suited to JSON string unescaping than Motoko.
   func stripNewlines(t : Text) : Text {
     t.replace(#char '\n', " ").replace(#char '\r', " ");
   };
 
   func callOpenAI(systemPrompt : Text, userPrompt : Text) : async Text {
     if (openAIKey.size() == 0) {
-      Runtime.trap("OpenAI API key not configured. An admin must set it first.");
+      Runtime.trap("OpenAI API key not configured. Set it in Settings first.");
     };
 
     let sp = stripNewlines(systemPrompt);
@@ -151,7 +155,6 @@ actor {
       { name = "Authorization"; value = "Bearer " # openAIKey },
     ];
 
-    // Return the raw OpenAI response — the frontend handles JSON extraction/parsing
     await OutCall.httpPostRequest(
       "https://api.openai.com/v1/chat/completions",
       headers,
